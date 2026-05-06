@@ -869,7 +869,14 @@
     background-size: cover; background-position: center;
     position: relative;
     filter: grayscale(0.2);
+    cursor: zoom-in;
   }
+  .pd-main.zoomed {
+    cursor: zoom-out;
+    background-size: 220%;
+    background-repeat: no-repeat;
+  }
+  .pd-main.zoomed .zoom { display: none; }
   .pd-main .zoom {
     position: absolute; bottom: 16px; right: 16px;
     background: rgba(0,0,0,0.6);
@@ -2464,7 +2471,7 @@
         <div class="pd-thumb" style="background-image:url('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&q=80&auto=format')"></div>
         <div class="pd-thumb" style="background-image:url('https://images.unsplash.com/photo-1593726831874-7d6748a92efe?w=300&q=80&auto=format')"></div>
       </div>
-      <div class="pd-main" style="background-image:url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=85&auto=format')">
+      <div class="pd-main" style="width: 540px; background-image:url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=85&auto=format')">
         <div class="zoom">КЛИКНИ ЗА ZOOM</div>
       </div>
       <div class="pd-info">
@@ -3443,6 +3450,74 @@
     plus.addEventListener('click', () => { input.value = parseInt(input.value) + 1; });
   });
   document.querySelectorAll('.promo-applied button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); b.parentElement.style.display = 'none'; }));
+
+  // Product gallery: thumbnail → main image swap + in-place zoom
+  (function () {
+    const thumbs = document.querySelectorAll('.pd-thumb');
+    const mainImage = document.querySelector('.pd-main');
+    if (!mainImage) return;
+
+    function extractUrl(el) {
+      const m = (el.style.backgroundImage || '').match(/url\(['"]?([^'")]+)['"]?\)/);
+      return m ? m[1] : '';
+    }
+    function withWidth(url, w) {
+      return /[?&]w=\d+/.test(url)
+        ? url.replace(/([?&])w=\d+/, '$1w=' + w)
+        : url + (url.includes('?') ? '&' : '?') + 'w=' + w;
+    }
+    function zoomOut() {
+      mainImage.classList.remove('zoomed');
+      mainImage.style.backgroundPosition = '';
+    }
+    function panFromEvent(e) {
+      const rect = mainImage.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      mainImage.style.backgroundPosition = x + '% ' + y + '%';
+    }
+
+    thumbs.forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        thumbs.forEach(t => t.classList.remove('active'));
+        thumb.classList.add('active');
+        const url = extractUrl(thumb);
+        if (!url) return;
+        zoomOut();
+        mainImage.style.backgroundImage = "url('" + withWidth(url, 1200) + "')";
+      });
+    });
+
+    mainImage.addEventListener('click', (e) => {
+      if (mainImage.classList.contains('zoomed')) {
+        zoomOut();
+        return;
+      }
+      panFromEvent(e);
+      mainImage.classList.add('zoomed');
+      const baseUrl = extractUrl(mainImage);
+      if (baseUrl && !/[?&]w=2400/.test(baseUrl)) {
+        const hiRes = withWidth(baseUrl, 2400);
+        const preloader = new Image();
+        preloader.onload = () => {
+          if (mainImage.classList.contains('zoomed')) {
+            mainImage.style.backgroundImage = "url('" + hiRes + "')";
+          }
+        };
+        preloader.src = hiRes;
+      }
+    });
+
+    mainImage.addEventListener('mousemove', (e) => {
+      if (!mainImage.classList.contains('zoomed')) return;
+      panFromEvent(e);
+    });
+    mainImage.addEventListener('mouseleave', () => {
+      if (mainImage.classList.contains('zoomed')) {
+        mainImage.style.backgroundPosition = 'center';
+      }
+    });
+  })();
 </script>
 
 </body>
